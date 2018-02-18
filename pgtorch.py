@@ -23,6 +23,8 @@ parser.add_argument('--log-interval', type=int, default=1, metavar='N',
                     help='interval between training status logs (default: 10)')
 parser.add_argument('--environment', type=str, default='Pong-v0',
                     help='Select prefered test environment')
+parser.add_argument('--resume', type=bool, default=True,
+                    help='Resume from current place')
 args = parser.parse_args()
 
 
@@ -32,6 +34,7 @@ torch.manual_seed(args.seed)  # Set random seed for pytorch
 action_space = env.action_space.n  # possible actions
 state_space = env.observation_space.shape  # Size of the observation space
 size_in = 80 * 80
+PATH = 'model_save.p'
 
 def prepro(I):
     """ prepro 210x160x3 uint8 frame into 6400 (80x80) 1D float vector """
@@ -56,10 +59,13 @@ class Policy(nn.Module):
         action_scores = self.affine2(x)
         return F.softmax(action_scores, dim=1)
 
-
-policy = Policy()
-optimizer = optim.Adam(policy.parameters(), lr=1e-3)  # look into decaying
-
+if args.resume:
+    policy = Policy()
+    policy.load_state_dict(torch.load(PATH))
+    optimizer = optim.Adam(policy.parameters(), lr=1e-3)  # look into decaying
+else:
+    policy = Policy()
+    optimizer = optim.Adam(policy.parameters(), lr=1e-3)  # look into decaying
 
 def select_action(state):
     state = torch.from_numpy(state).float().unsqueeze(0)  # Convert from numpy
@@ -113,6 +119,7 @@ def main():
         if i_episode % args.log_interval == 0:
             print('Episode: {}\tScore: {}\tAverage score: {}'.format(
                 i_episode, reward_sum, np.mean(running_reward)))
+            torch.save(policy.state_dict(), PATH)
 
 
 if __name__ == '__main__':
